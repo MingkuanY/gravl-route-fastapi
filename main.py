@@ -43,7 +43,3 @@ async def process_polyline(data: PolylineInput):
   fips_codes = sorted_counties["FIPS"].tolist()
 
   return {"fips_codes": fips_codes}
-
-if __name__ == "__main__":
-  import uvicorn
-  uvicorn.run(app, host="0.0.0.0", port=8000)
