@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from mangum import Mangum
 
 import geopandas as gpd
 from shapely.geometry import LineString
@@ -8,7 +7,6 @@ from pydantic import BaseModel
 from typing import List
 
 app = FastAPI()
-handler = Mangum(app)
 
 app.add_middleware(
   CORSMiddleware,
