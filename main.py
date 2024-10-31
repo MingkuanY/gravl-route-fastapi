@@ -18,6 +18,10 @@ app.add_middleware(
 
 class PolylineInput(BaseModel):
   polyline: List[List[float]]
+  
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Gravl"}
 
 @app.post("/process_polyline/")
 async def process_polyline(data: PolylineInput):
