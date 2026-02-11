@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 import geopandas as gpd
-from shapely.geometry import LineString
-from pydantic import BaseModel
+from shapely.geometry import LineString, Point
+from pydantic import BaseModel, Field
 from typing import List
 
 app = FastAPI()
@@ -23,6 +24,10 @@ class PolylineInput(BaseModel):
   
 class PolylineBatchInput(BaseModel):
   polylines: List[List[List[float]]]
+
+class PointRequest(BaseModel):
+  lat: float = Field(..., ge=-90, le=90, description="Latitude")
+  lng: float = Field(..., ge=-180, le=180, description="Longitude")
   
 @app.get("/")
 async def root():
@@ -77,3 +82,54 @@ async def process_polylines_batch(data: PolylineBatchInput):
       results.append(process_single_polyline(polyline))
 
   return {"results": results}
+
+@app.post("/get_county_from_point/")
+async def get_county_from_point(request: PointRequest):
+  """
+  Perform point-in-polygon lookup to find the US county FIPS code
+  for a single geographic coordinate.
+  """
+  try:
+    point = Point(request.lng, request.lat)
+    
+    matches = counties_gdf[counties_gdf.geometry.contains(point)]
+    
+    if len(matches) == 0:
+      return {
+        "fips_code": None,
+        "county_name": None
+      }
+    
+    match = matches.iloc[0]
+    fips_code = str(match["FIPS"]).zfill(5)  # Ensure 5 digits
+    
+    county_name = None
+    if "NAME" in match.index:
+      county_name = match["NAME"]
+    elif "COUNTYNAME" in match.index:
+      county_name = match["COUNTYNAME"]
+    elif "County_Nam" in match.index:
+      county_name = match["County_Nam"]
+    
+    return {
+      "fips_code": fips_code,
+      "county_name": county_name
+    }
+    
+  except Exception as e:
+    raise HTTPException(
+      status_code=500,
+      detail=f"Error performing spatial lookup: {str(e)}"
+    )
+
+@app.options("/get_county_from_point/")
+async def get_county_from_point_options():
+  """Handle CORS preflight requests"""
+  return JSONResponse(
+    content={},
+    headers={
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    }
+  )
