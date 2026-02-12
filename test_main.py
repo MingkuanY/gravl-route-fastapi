@@ -157,17 +157,16 @@ class TestConvertImages:
     
     def test_too_many_files(self):
         """Test that uploading more than MAX_FILES returns 400 error"""
-        # Create 11 files (max is 10)
+        # Create 21 files (max is 20)
         files = [
             ("files", (f"test{i}.jpg", create_test_image(format='JPEG'), "image/jpeg"))
-            for i in range(11)
+            for i in range(21)
         ]
         
         response = client.post("/convert_images/", files=files)
         
         assert response.status_code == 400
         assert "Too many files" in response.json()["detail"]
-        assert "max 10 per batch" in response.json()["detail"]
     
     def test_invalid_file_returns_null(self):
         """Test that invalid files return null in the results array"""

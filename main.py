@@ -10,7 +10,6 @@ from PIL import Image
 from pillow_heif import register_heif_opener
 import io
 import base64
-from concurrent.futures import ThreadPoolExecutor
 
 register_heif_opener()  # Enable HEIC support in Pillow
 
@@ -142,59 +141,53 @@ async def get_county_from_point_options():
   )
 
 # Image conversion constants
-MAX_FILES = 10  # Per batch
-MAX_SIZE_MB = 5  # Per individual file
+MAX_FILES = 20
+MAX_SIZE_MB = 10
 THUMBNAIL_SIZE = (400, 400)
-JPEG_QUALITY = 50  # Lower quality for faster processing
-
-def convert_single_image(file_data: tuple) -> str | None:
-  """
-  Convert a single image to JPEG thumbnail.
-  Args:
-    file_data: tuple of (filename, content_bytes)
-  Returns:
-    Base64-encoded JPEG string or None if conversion fails
-  """
-  filename, content = file_data
-  
-  try:
-    if len(content) > MAX_SIZE_MB * 1024 * 1024:
-      return None
-    
-    img = Image.open(io.BytesIO(content))
-    
-    if img.mode != 'RGB':
-      img = img.convert('RGB')
-    
-    img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-    
-    output = io.BytesIO()
-    img.save(output, format='JPEG', quality=JPEG_QUALITY, optimize=True)
-    jpeg_data = output.getvalue()
-    
-    return base64.b64encode(jpeg_data).decode('utf-8')
-    
-  except Exception as e:
-    print(f"Error converting {filename}: {e}")
-    return None
+JPEG_QUALITY = 60
 
 @app.post("/convert_images/")
 async def convert_images(files: List[UploadFile]):
   """
-  Convert and resize images to JPEG thumbnails in parallel.
+  Convert and resize images to JPEG thumbnails.
   Returns base64-encoded JPEG strings.
   """
   if len(files) > MAX_FILES:
-    raise HTTPException(status_code=400, detail=f"Too many files (max {MAX_FILES} per batch)")
+    raise HTTPException(status_code=400, detail=f"Too many files (max {MAX_FILES})")
   
-  # Read all filecontents first (async)
-  file_data = []
+  results = []
+  
   for file in files:
-    content = await file.read()
-    file_data.append((file.filename, content))
-  
-  with ThreadPoolExecutor(max_workers=MAX_FILES) as executor:
-    results = list(executor.map(convert_single_image, file_data))
+    try:
+      # Read file content
+      content = await file.read()
+      
+      if len(content) > MAX_SIZE_MB * 1024 * 1024:
+        results.append(None)
+        continue
+      
+      # Open image (supports HEIC via pillow-heif)
+      img = Image.open(io.BytesIO(content))
+      
+      # Convert to RGB (HEIC might be in different color space)
+      if img.mode != 'RGB':
+        img = img.convert('RGB')
+      
+      # Resize to thumbnail (maintains aspect ratio)
+      img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
+      
+      # Convert to JPEG in memory
+      output = io.BytesIO()
+      img.save(output, format='JPEG', quality=JPEG_QUALITY, optimize=True)
+      jpeg_data = output.getvalue()
+      
+      # Encode as base64
+      base64_str = base64.b64encode(jpeg_data).decode('utf-8')
+      results.append(base64_str)
+      
+    except Exception as e:
+      print(f"Error converting {file.filename}: {e}")
+      results.append(None)
   
   return JSONResponse(
     content={"images": results},

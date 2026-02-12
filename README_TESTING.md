@@ -72,7 +72,7 @@ pytest test_main.py::TestGetCountyFromPoint::test_point_inside_county
 
 - ✅ Single image conversion (JPEG)
 - ✅ Multiple images conversion (mixed formats)
-- ✅ Too many files (> 10 files returns 400)
+- ✅ Too many files (> 20 files returns 400)
 - ✅ Invalid file handling (returns null for failed conversions)
 - ✅ Image resizing to thumbnail (400x400 max)
 - ✅ CORS headers present
