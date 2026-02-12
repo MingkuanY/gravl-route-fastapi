@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -6,12 +6,6 @@ import geopandas as gpd
 from shapely.geometry import LineString, Point
 from pydantic import BaseModel, Field
 from typing import List
-from PIL import Image
-from pillow_heif import register_heif_opener
-import io
-import base64
-
-register_heif_opener()  # Enable HEIC support in Pillow
 
 app = FastAPI()
 
@@ -131,76 +125,6 @@ async def get_county_from_point(request: PointRequest):
 @app.options("/get_county_from_point/")
 async def get_county_from_point_options():
   """Handle CORS preflight requests"""
-  return JSONResponse(
-    content={},
-    headers={
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    }
-  )
-
-# Image conversion constants
-MAX_FILES = 20
-MAX_SIZE_MB = 10
-THUMBNAIL_SIZE = (400, 400)
-JPEG_QUALITY = 60
-
-@app.post("/convert_images/")
-async def convert_images(files: List[UploadFile]):
-  """
-  Convert and resize images to JPEG thumbnails.
-  Returns base64-encoded JPEG strings.
-  """
-  if len(files) > MAX_FILES:
-    raise HTTPException(status_code=400, detail=f"Too many files (max {MAX_FILES})")
-  
-  results = []
-  
-  for file in files:
-    try:
-      # Read file content
-      content = await file.read()
-      
-      if len(content) > MAX_SIZE_MB * 1024 * 1024:
-        results.append(None)
-        continue
-      
-      # Open image (supports HEIC via pillow-heif)
-      img = Image.open(io.BytesIO(content))
-      
-      # Convert to RGB (HEIC might be in different color space)
-      if img.mode != 'RGB':
-        img = img.convert('RGB')
-      
-      # Resize to thumbnail (maintains aspect ratio)
-      img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-      
-      # Convert to JPEG in memory
-      output = io.BytesIO()
-      img.save(output, format='JPEG', quality=JPEG_QUALITY, optimize=True)
-      jpeg_data = output.getvalue()
-      
-      # Encode as base64
-      base64_str = base64.b64encode(jpeg_data).decode('utf-8')
-      results.append(base64_str)
-      
-    except Exception as e:
-      print(f"Error converting {file.filename}: {e}")
-      results.append(None)
-  
-  return JSONResponse(
-    content={"images": results},
-    headers={
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    }
-  )
-
-@app.options("/convert_images/")
-async def convert_images_options():
-  """Handle CORS preflight"""
   return JSONResponse(
     content={},
     headers={

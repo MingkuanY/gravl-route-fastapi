@@ -3,6 +3,3 @@ uvicorn
 geopandas
 shapely
 pydantic
-pillow
-pillow-heif
-python-multipart
